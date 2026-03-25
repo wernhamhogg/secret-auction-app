@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
+type Lot = {
+  lot_id: string;
+  locked: boolean;
+};
+
 export default function AuctioneerPage() {
   const [allowed, setAllowed] = useState(false);
-  const [lotId, setLotId] = useState("lot-1");
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [selectedLot, setSelectedLot] = useState<string>("");
   const [currentBid, setCurrentBid] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -13,44 +19,92 @@ export default function AuctioneerPage() {
     displayName: string;
     winningBid: number;
   } | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
 
-  // Check login and role
+  // Initial load: auth, role, lots, display name
   useEffect(() => {
-    async function checkAccess() {
-      const { data } = await supabaseBrowser.auth.getUser();
-      if (!data.user) {
+    async function init() {
+      // Must be logged in
+      const { data: userData } = await supabaseBrowser.auth.getUser();
+      if (!userData.user) {
         window.location.href = "/login";
         return;
       }
 
-      const session = await supabaseBrowser.auth.getSession();
-      const token = session.data.session?.access_token;
+      // Load display name
+      const { data: profile } = await supabaseBrowser
+        .from("profiles")
+        .select("display_name, role")
+        .eq("id", userData.user.id)
+        .single();
 
-      const res = await fetch("/api/my-role", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      const roleData = await res.json();
-
-      if (roleData.role !== "auctioneer") {
+      if (profile?.role !== "auctioneer") {
         window.location.href = "/";
         return;
       }
 
+      setDisplayName(profile.display_name || "Auctioneer");
+
+      // Load lots
+      const { data: lotsData } = await supabaseBrowser
+        .from("lots")
+        .select("lot_id, locked")
+        .order("lot_id");
+
+      setLots(lotsData || []);
+      setSelectedLot(lotsData?.[0]?.lot_id || "");
+
       setAllowed(true);
     }
 
-    checkAccess();
+    init();
   }, []);
+
+  async function logout() {
+    await supabaseBrowser.auth.signOut();
+    window.location.href = "/";
+  }
+
+  async function checkBid(e: React.FormEvent) {
+    e.preventDefault();
+    setResult(null);
+    setStatusMessage(null);
+
+    const session = await supabaseBrowser.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    const res = await fetch("/api/check-bid", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        lotId: selectedLot,
+        currentBid: Number(currentBid)
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      setStatusMessage(data.error);
+      return;
+    }
+
+    setResult(
+      data.higherSecretBid
+        ? "❌ There exists a higher secret bid"
+        : "✅ You are the high bidder"
+    );
+  }
 
   async function endAuction() {
     setStatusMessage(null);
     setWinner(null);
 
     const confirmEnd = window.confirm(
-      "Are you sure you want to end the auction?"
+      `End auction for ${selectedLot}? This cannot be undone.`
     );
     if (!confirmEnd) return;
 
@@ -63,43 +117,16 @@ export default function AuctioneerPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ lotId })
+      body: JSON.stringify({ lotId: selectedLot })
     });
 
     const data = await res.json();
     setStatusMessage(data.status || data.error);
   }
 
-  async function checkBid(e: React.FormEvent) {
-    e.preventDefault();
-    setResult(null);
-
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/check-bid", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        lotId,
-        currentBid: Number(currentBid)
-      })
-    });
-
-    const data = await res.json();
-
-    setResult(
-      data.higherSecretBid
-        ? "❌ There exists a higher secret bid"
-        : "✅ You are the high bidder"
-    );
-  }
-
   async function showWinner() {
     setWinner(null);
+    setStatusMessage(null);
 
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
@@ -110,7 +137,7 @@ export default function AuctioneerPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ lotId })
+      body: JSON.stringify({ lotId: selectedLot })
     });
 
     const data = await res.json();
@@ -128,19 +155,32 @@ export default function AuctioneerPage() {
 
   return (
     <main>
+      <header style={{ marginBottom: "20px" }}>
+        <strong>Logged in as:</strong> {displayName}
+        <br />
+        <button onClick={logout}>Log out</button>
+      </header>
+
       <h1>Auctioneer</h1>
 
       <div>
-        <label>Lot ID</label><br />
-        <input
-          value={lotId}
-          onChange={e => setLotId(e.target.value)}
-        />
+        <label>Select Lot</label><br />
+        <select
+          value={selectedLot}
+          onChange={e => setSelectedLot(e.target.value)}
+        >
+          {lots.map(lot => (
+            <option key={lot.lot_id} value={lot.lot_id}>
+              {lot.lot_id} {lot.locked ? "(ended)" : ""}
+            </option>
+          ))}
+        </select>
       </div>
 
       <br />
 
       <button onClick={endAuction}>End Auction</button>
+
       <br /><br />
 
       <form onSubmit={checkBid}>
