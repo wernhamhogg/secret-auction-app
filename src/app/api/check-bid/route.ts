@@ -1,25 +1,15 @@
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: Request) {
-  const cookieStore = cookies();
+  const authHeader = req.headers.get("authorization");
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        }
-      }
-    }
+  if (!authHeader) {
+    return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+  }
+
+  const supabase = createSupabaseServerClient(
+    authHeader.replace("Bearer ", "")
   );
 
   const {
@@ -27,7 +17,7 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid user" }, { status: 401 });
   }
 
   const { data: profile } = await supabase
