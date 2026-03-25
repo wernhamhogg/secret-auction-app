@@ -4,27 +4,54 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function BidderPage() {
-  const [lotId, setLotId] = useState("");
+  const [lotId, setLotId] = useState("lot-1");
   const [maxBid, setMaxBid] = useState("");
-  const [message, setMessage] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
 
-  // Redirect to login if not logged in
+  // Require login
   useEffect(() => {
-    supabaseBrowser.auth.getUser().then(({ data }) => {
+    async function checkLogin() {
+      const { data } = await supabaseBrowser.auth.getUser();
       if (!data.user) {
         window.location.href = "/login";
       }
-    });
+    }
+
+    checkLogin();
   }, []);
 
-  async function submitBid(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveDisplayName() {
+    setMessage(null);
 
-    // 1. Get the current session
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
 
-    // 2. Send bid to API with auth token
+    const res = await fetch("/api/set-display-name", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ displayName })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      setMessage(data.error);
+    } else {
+      setMessage("✅ Display name saved");
+    }
+  }
+
+  async function submitBid(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+
+    const session = await supabaseBrowser.auth.getSession();
+    const token = session.data.session?.access_token;
+
     const res = await fetch("/api/submit-bid", {
       method: "POST",
       headers: {
@@ -38,20 +65,44 @@ export default function BidderPage() {
     });
 
     const data = await res.json();
-    setMessage(data.status || data.error || "Done");
+
+    if (data.error) {
+      setMessage(data.error);
+    } else {
+      setMessage("✅ Bid submitted");
+    }
   }
 
   return (
     <main>
-      <h1>Submit Secret Bid</h1>
+      <h1>Bidder</h1>
 
-      <form onSubmit={submitBid}>
+      <section>
+        <h3>Your Display Name</h3>
+
+        <input
+          placeholder="e.g. Alice / Paddle 12"
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value)}
+        />
+
+        <br /><br />
+
+        <button onClick={saveDisplayName}>
+          Save Display Name
+        </button>
+      </section>
+
+      <hr />
+
+      <section>
+        <h3>Submit Secret Bid</h3>
+
         <div>
           <label>Lot ID</label><br />
           <input
             value={lotId}
             onChange={e => setLotId(e.target.value)}
-            required
           />
         </div>
 
@@ -65,8 +116,12 @@ export default function BidderPage() {
           />
         </div>
 
-        <button type="submit">Submit Bid</button>
-      </form>
+        <button onClick={submitBid}>
+          Submit Bid
+        </button>
+      </section>
+
+      <br />
 
       {message && <p>{message}</p>}
     </main>

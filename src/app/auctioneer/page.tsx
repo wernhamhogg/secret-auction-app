@@ -9,12 +9,16 @@ export default function AuctioneerPage() {
   const [currentBid, setCurrentBid] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [winner, setWinner] = useState<{
+    displayName: string;
+    winningBid: number;
+  } | null>(null);
 
-  // Check login and role on page load
+  // Check login and role
   useEffect(() => {
     async function checkAccess() {
-      const { data: userData } = await supabaseBrowser.auth.getUser();
-      if (!userData.user) {
+      const { data } = await supabaseBrowser.auth.getUser();
+      if (!data.user) {
         window.location.href = "/login";
         return;
       }
@@ -41,11 +45,34 @@ export default function AuctioneerPage() {
     checkAccess();
   }, []);
 
+  async function endAuction() {
+    setStatusMessage(null);
+    setWinner(null);
+
+    const confirmEnd = window.confirm(
+      "Are you sure you want to end the auction?"
+    );
+    if (!confirmEnd) return;
+
+    const session = await supabaseBrowser.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    const res = await fetch("/api/end-auction", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ lotId })
+    });
+
+    const data = await res.json();
+    setStatusMessage(data.status || data.error);
+  }
+
   async function checkBid(e: React.FormEvent) {
     e.preventDefault();
-
     setResult(null);
-    setStatusMessage(null);
 
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
@@ -64,11 +91,6 @@ export default function AuctioneerPage() {
 
     const data = await res.json();
 
-    if (data.error) {
-      setStatusMessage(data.error);
-      return;
-    }
-
     setResult(
       data.higherSecretBid
         ? "❌ There exists a higher secret bid"
@@ -76,19 +98,13 @@ export default function AuctioneerPage() {
     );
   }
 
-  async function endAuction() {
-    setStatusMessage(null);
-
-    const confirmEnd = window.confirm(
-      "Are you sure you want to end the auction? This cannot be undone."
-    );
-
-    if (!confirmEnd) return;
+  async function showWinner() {
+    setWinner(null);
 
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
 
-    const res = await fetch("/api/end-auction", {
+    const res = await fetch("/api/get-winner", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -101,10 +117,9 @@ export default function AuctioneerPage() {
 
     if (data.error) {
       setStatusMessage(data.error);
-      return;
+    } else {
+      setWinner(data);
     }
-
-    setStatusMessage("✅ Auction ended successfully");
   }
 
   if (!allowed) {
@@ -116,7 +131,7 @@ export default function AuctioneerPage() {
       <h1>Auctioneer</h1>
 
       <div>
-        <strong>Lot ID</strong><br />
+        <label>Lot ID</label><br />
         <input
           value={lotId}
           onChange={e => setLotId(e.target.value)}
@@ -125,30 +140,39 @@ export default function AuctioneerPage() {
 
       <br />
 
-      <button onClick={endAuction}>
-        End Auction
-      </button>
-
+      <button onClick={endAuction}>End Auction</button>
       <br /><br />
 
       <form onSubmit={checkBid}>
-        <div>
-          <label>Current Bid</label><br />
-          <input
-            type="number"
-            value={currentBid}
-            onChange={e => setCurrentBid(e.target.value)}
-            required
-          />
-        </div>
-
+        <label>Current Bid</label><br />
+        <input
+          type="number"
+          value={currentBid}
+          onChange={e => setCurrentBid(e.target.value)}
+          required
+        />
+        <br />
         <button type="submit">Check Bid</button>
       </form>
 
       <br />
 
+      <button onClick={showWinner}>Show Winner</button>
+
+      <br /><br />
+
       {result && <p>{result}</p>}
       {statusMessage && <p>{statusMessage}</p>}
+
+      {winner && (
+        <div>
+          <h3>Winner</h3>
+          <p>
+            <strong>{winner.displayName}</strong><br />
+            Winning Bid: {winner.winningBid}
+          </p>
+        </div>
+      )}
     </main>
   );
 }
