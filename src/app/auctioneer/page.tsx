@@ -9,21 +9,21 @@ export default function AuctioneerPage() {
   const [currentBid, setCurrentBid] = useState("");
   const [result, setResult] = useState<string | null>(null);
 
-  // Check login + role on page load
+  // Check login and role on page load
   useEffect(() => {
     async function checkAccess() {
-      // 1. Must be logged in
-      const { data } = await supabaseBrowser.auth.getUser();
-      if (!data.user) {
+      // Must be logged in
+      const { data: userData } = await supabaseBrowser.auth.getUser();
+      if (!userData.user) {
         window.location.href = "/login";
         return;
       }
 
-      // 2. Get session token
+      // Get access token
       const session = await supabaseBrowser.auth.getSession();
       const token = session.data.session?.access_token;
 
-      // 3. Ask server what role this user has
+      // Ask server for role
       const res = await fetch("/api/my-role", {
         headers: {
           Authorization: `Bearer ${token}`
@@ -32,7 +32,6 @@ export default function AuctioneerPage() {
 
       const roleData = await res.json();
 
-      // 4. Only auctioneers allowed
       if (roleData.role !== "auctioneer") {
         window.location.href = "/";
         return;
@@ -47,11 +46,9 @@ export default function AuctioneerPage() {
   async function checkBid(e: React.FormEvent) {
     e.preventDefault();
 
-    // 1. Get session token
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
 
-    // 2. Call protected API
     const res = await fetch("/api/check-bid", {
       method: "POST",
       headers: {
@@ -64,4 +61,49 @@ export default function AuctioneerPage() {
       })
     });
 
-    const data =
+    const data = await res.json();
+
+    setResult(
+      data.higherSecretBid
+        ? "❌ There exists a higher secret bid"
+        : "✅ You are the high bidder"
+    );
+  }
+
+  if (!allowed) {
+    return <p>Checking access…</p>;
+  }
+
+  return (
+    <main>
+      <h1>Auctioneer</h1>
+
+      <form onSubmit={checkBid}>
+        <div>
+          <label>Lot ID</label>
+          <br />
+          <input
+            value={lotId}
+            onChange={(e) => setLotId(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Current Bid</label>
+          <br />
+          <input
+            type="number"
+            value={currentBid}
+            onChange={(e) => setCurrentBid(e.target.value)}
+            required
+          />
+        </div>
+
+        <button type="submit">Check Bid</button>
+      </form>
+
+      {result && <p>{result}</p>}
+    </main>
+  );
+}
