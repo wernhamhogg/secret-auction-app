@@ -2,48 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
+import Header from "@/components/Header";
 
 export default function BidderPage() {
   const [lotId, setLotId] = useState("lot-1");
   const [maxBid, setMaxBid] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
-  // Require login
   useEffect(() => {
-    async function checkLogin() {
-      const { data } = await supabaseBrowser.auth.getUser();
+    supabaseBrowser.auth.getUser().then(({ data }) => {
       if (!data.user) {
         window.location.href = "/login";
       }
-    }
-
-    checkLogin();
-  }, []);
-
-  async function saveDisplayName() {
-    setMessage(null);
-
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/set-display-name", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ displayName })
     });
-
-    const data = await res.json();
-
-    if (data.error) {
-      setMessage(data.error);
-    } else {
-      setMessage("✅ Display name saved");
-    }
-  }
+  }, []);
 
   async function submitBid(e: React.FormEvent) {
     e.preventDefault();
@@ -66,38 +38,16 @@ export default function BidderPage() {
 
     const data = await res.json();
 
-    if (data.error) {
-      setMessage(data.error);
-    } else {
-      setMessage("✅ Bid submitted");
-    }
+    setMessage(data.status || data.error);
   }
 
   return (
     <main>
+      <Header />
+
       <h1>Bidder</h1>
 
-      <section>
-        <h3>Your Display Name</h3>
-
-        <input
-          placeholder="e.g. Alice / Paddle 12"
-          value={displayName}
-          onChange={e => setDisplayName(e.target.value)}
-        />
-
-        <br /><br />
-
-        <button onClick={saveDisplayName}>
-          Save Display Name
-        </button>
-      </section>
-
-      <hr />
-
-      <section>
-        <h3>Submit Secret Bid</h3>
-
+      <form onSubmit={submitBid}>
         <div>
           <label>Lot ID</label><br />
           <input
@@ -116,12 +66,8 @@ export default function BidderPage() {
           />
         </div>
 
-        <button onClick={submitBid}>
-          Submit Bid
-        </button>
-      </section>
-
-      <br />
+        <button type="submit">Submit Bid</button>
+      </form>
 
       {message && <p>{message}</p>}
     </main>
