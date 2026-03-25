@@ -1,11 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function AuctioneerPage() {
+  const [allowed, setAllowed] = useState(false);
   const [lotId, setLotId] = useState("");
   const [currentBid, setCurrentBid] = useState("");
   const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function checkAccess() {
+      const { data } = await supabaseBrowser.auth.getUser();
+
+      if (!data.user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const res = await fetch("/api/my-role");
+      const roleData = await res.json();
+
+      if (roleData.role !== "auctioneer") {
+        window.location.href = "/";
+        return;
+      }
+
+      setAllowed(true);
+    }
+
+    checkAccess();
+  }, []);
 
   async function checkBid(e: React.FormEvent) {
     e.preventDefault();
@@ -20,6 +45,7 @@ export default function AuctioneerPage() {
     });
 
     const data = await res.json();
+
     setResult(
       data.higherSecretBid
         ? "❌ There exists a higher secret bid"
@@ -27,9 +53,13 @@ export default function AuctioneerPage() {
     );
   }
 
+  if (!allowed) {
+    return <p>Checking access…</p>;
+  }
+
   return (
     <main>
-      <h1>Auctioneer Check</h1>
+      <h1>Auctioneer</h1>
 
       <form onSubmit={checkBid}>
         <div>

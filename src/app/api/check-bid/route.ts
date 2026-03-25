@@ -1,7 +1,28 @@
-import { supabase } from "@/lib/supabase";
+import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
+  const supabase = createServerClient({ cookies });
+
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "auctioneer") {
+    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  }
+
   const { lotId, currentBid } = await req.json();
 
   const { data } = await supabase
@@ -9,11 +30,9 @@ export async function POST(req: Request) {
     .select("max_bid")
     .eq("lot_id", lotId);
 
-  const higherBidExists = data?.some(
-    (bid) => Number(bid.max_bid) > Number(currentBid)
+  const higherSecretBid = data?.some(
+    bid => Number(bid.max_bid) > Number(currentBid)
   );
 
-  return NextResponse.json({
-    higherSecretBid: higherBidExists
-  });
+  return NextResponse.json({ higherSecretBid });
 }
