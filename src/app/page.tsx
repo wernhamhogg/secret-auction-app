@@ -1,36 +1,48 @@
 "use client";
 
+import Image from "next/image";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function HomePage() {
-  async function goToBidder() {
+  async function enterAuction() {
     const { data } = await supabaseBrowser.auth.getUser();
 
     if (!data.user) {
       window.location.href = "/login";
     } else {
-      window.location.href = "/bidder";
-    }
-  }
-
-  async function goToAuctioneer() {
-    const { data } = await supabaseBrowser.auth.getUser();
-
-    if (!data.user) {
-      window.location.href = "/login";
-    } else {
-      window.location.href = "/auctioneer";
+      window.location.href = "/role";
     }
   }
 
   return (
     <main>
-      <h1>Welcome</h1>
-      <p>Please choose your role:</p>
+      <div className="card">
+        <h1>Confidential Auction Platform</h1>
 
-      <button onClick={goToBidder}>I am a Bidder</button>
-      <br /><br />
-      <button onClick={goToAuctioneer}>I am the Auctioneer</button>
+        <p>
+          A secure, sealed‑bid auction environment designed for
+          professional and private use.
+        </p>
+
+        <div style={{ margin: "32px 0" }}>
+          <Image
+            src="/landing.png"
+            alt="Auction illustration"
+            width={1408}
+            height={768}
+            priority
+            style={{
+              width: "100%",
+              height: "auto",
+              borderRadius: "8px"
+            }}
+          />
+        </div>
+
+        <button onClick={enterAuction}>
+          Enter the auction
+        </button>
+      </div>
     </main>
   );
 }
