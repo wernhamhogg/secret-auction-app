@@ -1,25 +1,48 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function RolePage() {
-  async function chooseBidder() {
-    const { data } = await supabaseBrowser.auth.getUser();
-    if (!data.user) {
-      window.location.href = "/login";
-      return;
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadRole() {
+      const { data } = await supabaseBrowser.auth.getUser();
+      if (!data.user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const { data: profile } = await supabaseBrowser
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      setRole(profile?.role || null);
     }
 
-    await supabaseBrowser
-      .from("profiles")
-      .update({ role: "bidder" })
-      .eq("id", data.user.id);
+    loadRole();
+  }, []);
+
+  async function enterBidder() {
+    const { data } = await supabaseBrowser.auth.getUser();
+    if (!data.user) return;
+
+    // ✅ Only set bidder if no role exists yet
+    if (!role) {
+      await supabaseBrowser
+        .from("profiles")
+        .update({ role: "bidder" })
+        .eq("id", data.user.id);
+    }
 
     window.location.href = "/bidder";
   }
 
-  async function goAuctioneer() {
-    // 🚫 Do NOT set role here
+  function enterAuctioneer() {
+    // ✅ Never modify role here
     window.location.href = "/auctioneer";
   }
 
@@ -28,13 +51,13 @@ export default function RolePage() {
       <div className="panel animate-fade-up">
         <h1>Choose your role</h1>
 
-        <button onClick={chooseBidder}>
+        <button onClick={enterBidder}>
           Enter as Bidder
         </button>
 
         <br /><br />
 
-        <button onClick={goAuctioneer}>
+        <button onClick={enterAuctioneer}>
           Enter as Auctioneer
         </button>
       </div>
