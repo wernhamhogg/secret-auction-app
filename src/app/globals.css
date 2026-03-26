@@ -8,67 +8,60 @@
 html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
-  background-color: #f6f7f8;
-  color: #1f2933;
+  background-color: #f3f4f6;
+  color: #111827;
   line-height: 1.6;
 }
 
 /* ===== Layout ===== */
 main {
-  max-width: 960px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 40px 24px;
 }
 
-header {
-  margin-bottom: 32px;
-}
-
 /* ===== Typography ===== */
 h1 {
-  font-size: 2rem;
-  font-weight: 600;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   margin-bottom: 16px;
 }
 
 h2 {
   font-size: 1.4rem;
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 12px;
-}
-
-h3 {
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-bottom: 8px;
 }
 
 p {
-  margin-bottom: 12px;
-  color: #4b5563;
+  margin-bottom: 14px;
+  color: #374151;
 }
 
-/* ===== Form Elements ===== */
+/* ===== Inputs ===== */
 label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #4b5563;
 }
 
 input, select {
   width: 100%;
-  padding: 10px 12px;
-  margin-top: 4px;
-  margin-bottom: 16px;
+  padding: 12px 14px;
+  margin-top: 6px;
+  margin-bottom: 18px;
+  border-radius: 10px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
   font-size: 0.95rem;
-  background-color: #fff;
+  background-color: #ffffff;
 }
 
 input:focus, select:focus {
   outline: none;
-  border-color: #6b7280;
+  border-color: #111827;
 }
 
 /* ===== Buttons ===== */
@@ -76,34 +69,113 @@ button {
   background-color: #111827;
   color: #ffffff;
   border: none;
-  border-radius: 6px;
-  padding: 10px 16px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  border-radius: 999px;
+  padding: 12px 26px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 button:hover {
-  background-color: #1f2933;
-}
-
-button:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
-}
-
-/* ===== Cards ===== */
-.card {
   background-color: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
+  color: #111827;
+  border: 1px solid #111827;
 }
 
-/* ===== Subtle UI Elements ===== */
+/* ===== Panels / Cards ===== */
+.panel {
+  background-color: #ffffff;
+  border-radius: 18px;
+  padding: 36px;
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.08),
+    0 4px 10px rgba(0,0,0,0.04);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* ===== Utility ===== */
 hr {
   border: none;
   border-top: 1px solid #e5e7eb;
   margin: 32px 0;
+}/* ===== Animations ===== */
+
+/* Fade + slide in */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.6s ease-out both;
+}
+
+/* Slight hover lift */
+.hover-lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 24px 50px rgba(0,0,0,0.12),
+    0 6px 16px rgba(0,0,0,0.06);
+}
+
+/* Button press feedback */
+button {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    transform 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}/* ===== Mobile Refinements ===== */
+
+@media (max-width: 768px) {
+  main {
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    letter-spacing: 0.03em;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  p {
+    font-size: 0.95rem;
+  }
+
+  .panel {
+    padding: 24px;
+    border-radius: 14px;
+  }
+
+  input,
+  select {
+    font-size: 1rem;
+    padding: 14px 16px;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px 0;
+    font-size: 0.85rem;
+  }
 }

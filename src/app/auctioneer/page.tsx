@@ -1,218 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
-type Lot = {
-  lot_id: string;
-  locked: boolean;
-};
+export default function HomePage() {
+  async function enterAuction() {
+    const { data } = await supabaseBrowser.auth.getUser();
 
-export default function AuctioneerPage() {
-  const [allowed, setAllowed] = useState(false);
-  const [lots, setLots] = useState<Lot[]>([]);
-  const [selectedLot, setSelectedLot] = useState<string>("");
-  const [currentBid, setCurrentBid] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [winner, setWinner] = useState<{
-    displayName: string;
-    winningBid: number;
-  } | null>(null);
-  const [displayName, setDisplayName] = useState<string>("");
-
-  // Initial load: auth, role, lots, display name
-  useEffect(() => {
-    async function init() {
-      // Must be logged in
-      const { data: userData } = await supabaseBrowser.auth.getUser();
-      if (!userData.user) {
-        window.location.href = "/login";
-        return;
-      }
-
-      // Load display name
-      const { data: profile } = await supabaseBrowser
-        .from("profiles")
-        .select("display_name, role")
-        .eq("id", userData.user.id)
-        .single();
-
-      if (profile?.role !== "auctioneer") {
-        window.location.href = "/";
-        return;
-      }
-
-      setDisplayName(profile.display_name || "Auctioneer");
-
-      // Load lots
-      const { data: lotsData } = await supabaseBrowser
-        .from("lots")
-        .select("lot_id, locked")
-        .order("lot_id");
-
-      setLots(lotsData || []);
-      setSelectedLot(lotsData?.[0]?.lot_id || "");
-
-      setAllowed(true);
-    }
-
-    init();
-  }, []);
-
-  async function logout() {
-    await supabaseBrowser.auth.signOut();
-    window.location.href = "/";
-  }
-
-  async function checkBid(e: React.FormEvent) {
-    e.preventDefault();
-    setResult(null);
-    setStatusMessage(null);
-
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/check-bid", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        lotId: selectedLot,
-        currentBid: Number(currentBid)
-      })
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      setStatusMessage(data.error);
-      return;
-    }
-
-    setResult(
-      data.higherSecretBid
-        ? "❌ There exists a higher secret bid"
-        : "✅ You are the high bidder"
-    );
-  }
-
-  async function endAuction() {
-    setStatusMessage(null);
-    setWinner(null);
-
-    const confirmEnd = window.confirm(
-      `End auction for ${selectedLot}? This cannot be undone.`
-    );
-    if (!confirmEnd) return;
-
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/end-auction", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ lotId: selectedLot })
-    });
-
-    const data = await res.json();
-    setStatusMessage(data.status || data.error);
-  }
-
-  async function showWinner() {
-    setWinner(null);
-    setStatusMessage(null);
-
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/get-winner", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ lotId: selectedLot })
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      setStatusMessage(data.error);
+    if (!data.user) {
+      window.location.href = "/login";
     } else {
-      setWinner(data);
+      window.location.href = "/role";
     }
-  }
-
-  if (!allowed) {
-    return <p>Checking access…</p>;
   }
 
   return (
     <main>
-      <header style={{ marginBottom: "20px" }}>
-        <strong>Logged in as:</strong> {displayName}
-        <br />
-        <button onClick={logout}>Log out</button>
-      </header>
-
-      <h1>Auctioneer</h1>
-
-      <div>
-        <label>Select Lot</label><br />
-        <select
-          value={selectedLot}
-          onChange={e => setSelectedLot(e.target.value)}
-        >
-          {lots.map(lot => (
-            <option key={lot.lot_id} value={lot.lot_id}>
-              {lot.lot_id} {lot.locked ? "(ended)" : ""}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <br />
-
-      <button onClick={endAuction}>End Auction</button>
-
-      <br /><br />
-
-      <form onSubmit={checkBid}>
-        <label>Current Bid</label><br />
-        <input
-          type="number"
-          value={currentBid}
-          onChange={e => setCurrentBid(e.target.value)}
-          required
+      <div
+        style={{
+          position: "relative",
+          borderRadius: "16px",
+          overflow: "hidden"
+        }}
+      >
+        <Image
+          src="/landing.png"
+          alt="Blind auction"
+          width={1408}
+          height={768}
+          priority
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block"
+          }}
         />
-        <br />
-        <button type="submit">Check Bid</button>
-      </form>
 
-      <br />
+        {/* Overlay */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.75) 100%)"
+          }}
+        />
 
-      <button onClick={showWinner}>Show Winner</button>
+        {/* Content */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            padding: "clamp(20px, 6vw, 48px)",
+            color: "#ffffff"
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "clamp(1.8rem, 5vw, 3rem)",
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              marginBottom: "12px",
+              textShadow: "0 2px 10px rgba(0,0,0,0.6)"
+            }}
+          >
+            BBA BLIND AUCTION
+          </h1>
 
-      <br /><br />
-
-      {result && <p>{result}</p>}
-      {statusMessage && <p>{statusMessage}</p>}
-
-      {winner && (
-        <div>
-          <h3>Winner</h3>
-          <p>
-            <strong>{winner.displayName}</strong><br />
-            Winning Bid: {winner.winningBid}
+          <p
+            style={{
+              fontSize: "clamp(0.95rem, 3vw, 1.15rem)",
+              fontWeight: 500,
+              color: "#f9fafb",
+              marginBottom: "28px",
+              maxWidth: "640px",
+              textShadow: "0 2px 8px rgba(0,0,0,0.6)"
+            }}
+          >
+            FOR THOSE NOT MAN ENOUGH TO TAKE PART IN PERSON
           </p>
+
+          <button
+            onClick={enterAuction}
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: "#ffffff",
+              color: "#111827",
+              padding: "14px 32px",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              borderRadius: "999px",
+              textTransform: "uppercase",
+              transition: "all 0.25s ease"
+            }}
+          >
+            Enter the auction
+          </button>
         </div>
-      )}
+      </div>
     </main>
   );
 }

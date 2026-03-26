@@ -29,17 +29,17 @@ export default function Header() {
   }
 
   return (
-    <header>
+    <header style={{ marginBottom: "24px" }}>
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
+          gap: "12px",
           justifyContent: "space-between",
           alignItems: "center"
         }}
       >
-        <div>
-          <strong>{displayName}</strong>
-        </div>
+        <strong>{displayName}</strong>
         <button onClick={logout}>Log out</button>
       </div>
     </header>

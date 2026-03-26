@@ -16,35 +16,31 @@ export default function BidderPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadData() {
+    async function load() {
       const { data: userData } = await supabaseBrowser.auth.getUser();
       if (!userData.user) {
         window.location.href = "/login";
         return;
       }
 
-      // Load lots
       const { data: lotsData } = await supabaseBrowser
         .from("lots")
-        .select("lot_id, locked");
+        .select("lot_id, locked")
+        .order("lot_id");
 
       setLots(lotsData || []);
 
-      // Load user's existing bids
       const { data: bidsData } = await supabaseBrowser
         .from("bids")
         .select("lot_id, max_bid")
         .eq("bidder_id", userData.user.id);
 
-      const bidMap: Record<string, number> = {};
-      bidsData?.forEach(b => {
-        bidMap[b.lot_id] = b.max_bid;
-      });
-
-      setMyBids(bidMap);
+      const map: Record<string, number> = {};
+      bidsData?.forEach(b => (map[b.lot_id] = b.max_bid));
+      setMyBids(map);
     }
 
-    loadData();
+    load();
   }, []);
 
   async function submitBid(lotId: string) {
@@ -66,11 +62,9 @@ export default function BidderPage() {
     });
 
     const data = await res.json();
+    setMessage(data.status || data.error);
 
-    if (data.error) {
-      setMessage(data.error);
-    } else {
-      setMessage(`✅ Bid submitted for ${lotId}`);
+    if (!data.error) {
       setMyBids(prev => ({
         ...prev,
         [lotId]: Number(bidInputs[lotId])
@@ -82,20 +76,24 @@ export default function BidderPage() {
     <main>
       <Header />
 
-      <h1>Available Lots</h1>
+      <div className="panel animate-fade-up">
+        <h1>Available Lots</h1>
 
-      {lots.map(lot => (
-        <div key={lot.lot_id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
-          <h3>{lot.lot_id}</h3>
+        {lots.map(lot => (
+          <div
+            key={lot.lot_id}
+            className="hover-lift"
+            style={{ marginBottom: "28px" }}
+          >
+            <h2>{lot.lot_id}</h2>
 
-          {lot.locked ? (
-            <p>🔒 Auction ended</p>
-          ) : (
-            <>
-              <div>
-                <label>Your max bid</label><br />
+            {lot.locked ? (
+              <p>🔒 Auction ended</p>
+            ) : (
+              <>
                 <input
                   type="number"
+                  placeholder="Your max bid"
                   value={bidInputs[lot.lot_id] || ""}
                   onChange={e =>
                     setBidInputs(prev => ({
@@ -104,23 +102,25 @@ export default function BidderPage() {
                     }))
                   }
                 />
-              </div>
 
-              <button onClick={() => submitBid(lot.lot_id)}>
-                Submit Bid
-              </button>
-            </>
-          )}
+                <button onClick={() => submitBid(lot.lot_id)}>
+                  Submit bid
+                </button>
+              </>
+            )}
 
-          {myBids[lot.lot_id] !== undefined && (
-            <p>
-              ✅ Your submitted bid: <strong>{myBids[lot.lot_id]}</strong>
-            </p>
-          )}
-        </div>
-      ))}
+            {myBids[lot.lot_id] !== undefined && (
+              <p>
+                Your bid: <strong>{myBids[lot.lot_id]}</strong>
+              </p>
+            )}
 
-      {message && <p>{message}</p>}
+            <hr />
+          </div>
+        ))}
+
+        {message && <p>{message}</p>}
+      </div>
     </main>
   );
 }
