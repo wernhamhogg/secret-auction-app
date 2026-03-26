@@ -3,41 +3,38 @@
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function RolePage() {
-  async function chooseRole(role: "bidder" | "auctioneer") {
+  async function chooseBidder() {
     const { data } = await supabaseBrowser.auth.getUser();
-
     if (!data.user) {
       window.location.href = "/login";
       return;
     }
 
-    // ✅ Persist role choice
     await supabaseBrowser
       .from("profiles")
-      .update({ role })
+      .update({ role: "bidder" })
       .eq("id", data.user.id);
 
-    // ✅ Navigate to role page
-    window.location.href =
-      role === "auctioneer" ? "/auctioneer" : "/bidder";
+    window.location.href = "/bidder";
+  }
+
+  async function goAuctioneer() {
+    // 🚫 Do NOT set role here
+    window.location.href = "/auctioneer";
   }
 
   return (
     <main>
-      <div className="panel animate-fade-up hover-lift">
+      <div className="panel animate-fade-up">
         <h1>Choose your role</h1>
 
-        <p>
-          Select how you would like to participate in the auction.
-        </p>
-
-        <button onClick={() => chooseRole("bidder")}>
+        <button onClick={chooseBidder}>
           Enter as Bidder
         </button>
 
         <br /><br />
 
-        <button onClick={() => chooseRole("auctioneer")}>
+        <button onClick={goAuctioneer}>
           Enter as Auctioneer
         </button>
       </div>
