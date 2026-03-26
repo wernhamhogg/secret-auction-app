@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import Header from "@/components/Header";
 
-type Lot = {
+type Auction = {
   lot_id: string;
-  locked: boolean;
+  winner_id: string | null;
+  winning_bid: number | null;
+  tie_break_applied: boolean;
+};
+
+type Profile = {
+  id: string;
+  display_name: string;
 };
 
 export default function AuctioneerPage() {
-  const [lots, setLots] = useState<Lot[]>([]);
-  const [selectedLot, setSelectedLot] = useState("");
-  const [currentBid, setCurrentBid] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [winner, setWinner] = useState<any>(null);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function load() {
@@ -36,125 +39,69 @@ export default function AuctioneerPage() {
         return;
       }
 
-      const { data: lotsData } = await supabaseBrowser
-        .from("lots")
-        .select("lot_id, locked")
+      const { data: auctionData } = await supabaseBrowser
+        .from("auctions")
+        .select("lot_id, winner_id, winning_bid, tie_break_applied")
         .order("lot_id");
 
-      setLots(lotsData || []);
-      setSelectedLot(lotsData?.[0]?.lot_id || "");
+      setAuctions(auctionData || []);
+
+      const { data: profileData } = await supabaseBrowser
+        .from("profiles")
+        .select("id, display_name");
+
+      const profileMap: Record<string, string> = {};
+      profileData?.forEach((p: Profile) => {
+        profileMap[p.id] = p.display_name;
+      });
+
+      setProfiles(profileMap);
     }
 
     load();
   }, []);
-
-  async function withToken(fn: (token: string) => Promise<void>) {
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-    if (token) await fn(token);
-  }
 
   return (
     <main>
       <Header />
 
       <div className="panel animate-fade-up">
-        <h1>Auctioneer</h1>
+        <h1>Auction Results</h1>
 
-        <label>Select lot</label>
-        <select
-          value={selectedLot}
-          onChange={e => setSelectedLot(e.target.value)}
-        >
-          {lots.map(lot => (
-            <option key={lot.lot_id} value={lot.lot_id}>
-              {lot.lot_id} {lot.locked ? "(ended)" : ""}
-            </option>
-          ))}
-        </select>
+        {auctions.map(a => (
+          <div
+            key={a.lot_id}
+            className="hover-lift"
+            style={{ marginBottom: "32px" }}
+          >
+            <h2>{a.lot_id}</h2>
 
-        <button
-          onClick={() =>
-            withToken(token =>
-              fetch("/api/end-auction", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ lotId: selectedLot })
-              }).then(() => setStatus("Auction ended"))
-            )
-          }
-        >
-          End auction
-        </button>
+            {a.winner_id ? (
+              <p>
+                Winner:{" "}
+                <strong>
+                  {profiles[a.winner_id] || "Unknown"}
+                </strong>{" "}
+                — <strong>{a.winning_bid}</strong>
+                {a.tie_break_applied && (
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      color: "#6b7280",
+                      fontSize: "0.85rem"
+                    }}
+                  >
+                    (tie‑break applied)
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p>No bids placed</p>
+            )}
 
-        <hr />
-
-        <input
-          type="number"
-          placeholder="Current bid"
-          value={currentBid}
-          onChange={e => setCurrentBid(e.target.value)}
-        />
-
-        <button
-          onClick={() =>
-            withToken(token =>
-              fetch("/api/check-bid", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  lotId: selectedLot,
-                  currentBid: Number(currentBid)
-                })
-              })
-                .then(r => r.json())
-                .then(d =>
-                  setResult(
-                    d.higherSecretBid
-                      ? "Higher secret bid exists"
-                      : "You are the high bidder"
-                  )
-                )
-            )
-          }
-        >
-          Check bid
-        </button>
-
-        <hr />
-
-        <button
-          onClick={() =>
-            withToken(token =>
-              fetch("/api/get-winner", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ lotId: selectedLot })
-              })
-                .then(r => r.json())
-                .then(setWinner)
-            )
-          }
-        >
-          Show winner
-        </button>
-
-        {result && <p>{result}</p>}
-        {status && <p>{status}</p>}
-        {winner && (
-          <p>
-            Winner: <strong>{winner.displayName}</strong> – {winner.winningBid}
-          </p>
-        )}
+            <hr />
+          </div>
+        ))}
       </div>
     </main>
   );

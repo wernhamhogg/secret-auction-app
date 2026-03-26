@@ -10,8 +10,9 @@ type Lot = {
 };
 
 type AuctionResult = {
-  winner_id: string;
-  winning_bid: number;
+  winner_id: string | null;
+  winning_bid: number | null;
+  tie_break_applied: boolean;
 };
 
 export default function BidderPage() {
@@ -20,8 +21,6 @@ export default function BidderPage() {
   const [results, setResults] = useState<Record<string, AuctionResult>>({});
   const [bidInputs, setBidInputs] = useState<Record<string, string>>({});
   const [userId, setUserId] = useState<string>("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -51,15 +50,17 @@ export default function BidderPage() {
 
       const { data: auctionData } = await supabaseBrowser
         .from("auctions")
-        .select("lot_id, winner_id, winning_bid");
+        .select("lot_id, winner_id, winning_bid, tie_break_applied");
 
       const resultMap: Record<string, AuctionResult> = {};
       auctionData?.forEach(a => {
         resultMap[a.lot_id] = {
           winner_id: a.winner_id,
-          winning_bid: a.winning_bid
+          winning_bid: a.winning_bid,
+          tie_break_applied: a.tie_break_applied
         };
       });
+
       setResults(resultMap);
     }
 
@@ -67,20 +68,10 @@ export default function BidderPage() {
   }, []);
 
   async function submitBid(lotId: string) {
-    setMessage(null);
-    setError(null);
-
-    const value = Number(bidInputs[lotId]);
-
-    if (!value || value < 0) {
-      setError("Please enter a valid bid amount");
-      return;
-    }
-
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
 
-    const res = await fetch("/api/submit-bid", {
+    await fetch("/api/submit-bid", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -88,24 +79,14 @@ export default function BidderPage() {
       },
       body: JSON.stringify({
         lotId,
-        maxBid: value
+        maxBid: Number(bidInputs[lotId])
       })
     });
 
-    const data = await res.json();
-
-    if (!res.ok || data.error) {
-      setError(data.error || "Failed to submit bid");
-      return;
-    }
-
-    // ✅ Optimistically update UI
     setMyBids(prev => ({
       ...prev,
-      [lotId]: value
+      [lotId]: Number(bidInputs[lotId])
     }));
-
-    setMessage("Bid updated successfully");
   }
 
   return (
@@ -114,18 +95,6 @@ export default function BidderPage() {
 
       <div className="panel animate-fade-up">
         <h1>Lots</h1>
-
-        {message && (
-          <p style={{ color: "#065f46", marginBottom: "16px" }}>
-            ✅ {message}
-          </p>
-        )}
-
-        {error && (
-          <p style={{ color: "#b91c1c", marginBottom: "16px" }}>
-            ⚠️ {error}
-          </p>
-        )}
 
         {lots.map(lot => {
           const auction = results[lot.lot_id];
@@ -176,6 +145,17 @@ export default function BidderPage() {
                     <p>
                       🏆 <strong>You won</strong> with a bid of{" "}
                       <strong>{auction.winning_bid}</strong>
+                      {auction.tie_break_applied && (
+                        <span
+                          style={{
+                            marginLeft: "6px",
+                            color: "#6b7280",
+                            fontSize: "0.85rem"
+                          }}
+                        >
+                          (tie‑break applied)
+                        </span>
+                      )}
                     </p>
                   ) : (
                     <p>❌ Auction ended — you did not win</p>
