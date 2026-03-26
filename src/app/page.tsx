@@ -23,31 +23,41 @@ export default function HomePage() {
           overflow: "hidden"
         }}
       >
-        {/* Background image */}
-        <Image
-          src="/landing.png"
-          alt="Blind auction"
-          width={1408}
-          height={768}
-          priority
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block"
-          }}
-        />
+        {/* Desktop image */}
+        <div className="hero-desktop">
+          <Image
+            src="/landing-desktop.png"
+            alt="Blind auction"
+            width={1408}
+            height={768}
+            priority
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </div>
 
-        {/* Dark overlay */}
+        {/* Mobile image */}
+        <div className="hero-mobile">
+          <Image
+            src="/landing-mobile.png"
+            alt="Blind auction"
+            width={768}
+            height={1408}
+            priority
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </div>
+
+        {/* Overlay */}
         <div
           style={{
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.75) 100%)"
+              "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.8) 100%)"
           }}
         />
 
-        {/* Content overlay */}
+        {/* Content */}
         <div
           style={{
             position: "absolute",
@@ -55,17 +65,17 @@ export default function HomePage() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
-            padding: "48px",
+            padding: "clamp(20px, 6vw, 48px)",
             color: "#ffffff"
           }}
         >
           <h1
             style={{
-              fontSize: "3rem",
+              fontSize: "clamp(1.8rem, 6vw, 3rem)",
               fontWeight: 700,
-              letterSpacing: "0.05em",
-              marginBottom: "14px",
-              textShadow: "0 2px 10px rgba(0,0,0,0.6)"
+              letterSpacing: "0.06em",
+              marginBottom: "12px",
+              textShadow: "0 2px 12px rgba(0,0,0,0.7)"
             }}
           >
             BBA BLIND AUCTION
@@ -73,12 +83,11 @@ export default function HomePage() {
 
           <p
             style={{
-              fontSize: "1.15rem",
+              fontSize: "clamp(0.95rem, 3.5vw, 1.15rem)",
               fontWeight: 500,
-              color: "#f9fafb",
-              marginBottom: "36px",
+              marginBottom: "28px",
               maxWidth: "640px",
-              textShadow: "0 2px 8px rgba(0,0,0,0.6)"
+              textShadow: "0 2px 10px rgba(0,0,0,0.7)"
             }}
           >
             FOR THOSE NOT MAN ENOUGH TO TAKE PART IN PERSON
@@ -90,21 +99,12 @@ export default function HomePage() {
               alignSelf: "flex-start",
               backgroundColor: "#ffffff",
               color: "#111827",
-              padding: "14px 30px",
-              fontSize: "0.95rem",
+              padding: "14px 32px",
+              fontSize: "0.85rem",
               fontWeight: 600,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.12em",
               borderRadius: "999px",
-              textTransform: "uppercase",
-              transition: "all 0.25s ease"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = "#111827";
-              e.currentTarget.style.color = "#ffffff";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = "#ffffff";
-              e.currentTarget.style.color = "#111827";
+              textTransform: "uppercase"
             }}
           >
             Enter the auction

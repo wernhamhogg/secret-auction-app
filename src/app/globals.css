@@ -178,4 +178,22 @@ button:active {
     padding: 14px 0;
     font-size: 0.85rem;
   }
+}/* ===== Landing Hero Image Swap ===== */
+
+.hero-desktop {
+  display: block;
+}
+
+.hero-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hero-desktop {
+    display: none;
+  }
+
+  .hero-mobile {
+    display: block;
+  }
 }

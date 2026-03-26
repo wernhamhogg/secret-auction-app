@@ -1,106 +1,160 @@
 "use client";
 
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
+import Header from "@/components/Header";
 
-export default function HomePage() {
-  async function enterAuction() {
-    const { data } = await supabaseBrowser.auth.getUser();
+type Lot = {
+  lot_id: string;
+  locked: boolean;
+};
 
-    if (!data.user) {
-      window.location.href = "/login";
-    } else {
-      window.location.href = "/role";
+export default function AuctioneerPage() {
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [selectedLot, setSelectedLot] = useState("");
+  const [currentBid, setCurrentBid] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [winner, setWinner] = useState<any>(null);
+
+  useEffect(() => {
+    async function load() {
+      const { data: userData } = await supabaseBrowser.auth.getUser();
+      if (!userData.user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const { data: profile } = await supabaseBrowser
+        .from("profiles")
+        .select("role")
+        .eq("id", userData.user.id)
+        .single();
+
+      if (profile?.role !== "auctioneer") {
+        window.location.href = "/";
+        return;
+      }
+
+      const { data: lotsData } = await supabaseBrowser
+        .from("lots")
+        .select("lot_id, locked")
+        .order("lot_id");
+
+      setLots(lotsData || []);
+      setSelectedLot(lotsData?.[0]?.lot_id || "");
     }
+
+    load();
+  }, []);
+
+  async function withToken(fn: (token: string) => Promise<void>) {
+    const session = await supabaseBrowser.auth.getSession();
+    const token = session.data.session?.access_token;
+    if (token) await fn(token);
   }
 
   return (
     <main>
-      <div
-        style={{
-          position: "relative",
-          borderRadius: "16px",
-          overflow: "hidden"
-        }}
-      >
-        <Image
-          src="/landing.png"
-          alt="Blind auction"
-          width={1408}
-          height={768}
-          priority
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block"
-          }}
-        />
+      <Header />
 
-        {/* Overlay */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.75) 100%)"
-          }}
-        />
+      <div className="panel animate-fade-up">
+        <h1>Auctioneer</h1>
 
-        {/* Content */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            padding: "clamp(20px, 6vw, 48px)",
-            color: "#ffffff"
-          }}
+        <label>Select lot</label>
+        <select
+          value={selectedLot}
+          onChange={e => setSelectedLot(e.target.value)}
         >
-          <h1
-            style={{
-              fontSize: "clamp(1.8rem, 5vw, 3rem)",
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-              marginBottom: "12px",
-              textShadow: "0 2px 10px rgba(0,0,0,0.6)"
-            }}
-          >
-            BBA BLIND AUCTION
-          </h1>
+          {lots.map(lot => (
+            <option key={lot.lot_id} value={lot.lot_id}>
+              {lot.lot_id} {lot.locked ? "(ended)" : ""}
+            </option>
+          ))}
+        </select>
 
-          <p
-            style={{
-              fontSize: "clamp(0.95rem, 3vw, 1.15rem)",
-              fontWeight: 500,
-              color: "#f9fafb",
-              marginBottom: "28px",
-              maxWidth: "640px",
-              textShadow: "0 2px 8px rgba(0,0,0,0.6)"
-            }}
-          >
-            FOR THOSE NOT MAN ENOUGH TO TAKE PART IN PERSON
+        <button
+          onClick={() =>
+            withToken(token =>
+              fetch("/api/end-auction", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ lotId: selectedLot })
+              }).then(() => setStatus("Auction ended"))
+            )
+          }
+        >
+          End auction
+        </button>
+
+        <hr />
+
+        <input
+          type="number"
+          placeholder="Current bid"
+          value={currentBid}
+          onChange={e => setCurrentBid(e.target.value)}
+        />
+
+        <button
+          onClick={() =>
+            withToken(token =>
+              fetch("/api/check-bid", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  lotId: selectedLot,
+                  currentBid: Number(currentBid)
+                })
+              })
+                .then(r => r.json())
+                .then(d =>
+                  setResult(
+                    d.higherSecretBid
+                      ? "Higher secret bid exists"
+                      : "You are the high bidder"
+                  )
+                )
+            )
+          }
+        >
+          Check bid
+        </button>
+
+        <hr />
+
+        <button
+          onClick={() =>
+            withToken(token =>
+              fetch("/api/get-winner", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ lotId: selectedLot })
+              })
+                .then(r => r.json())
+                .then(setWinner)
+            )
+          }
+        >
+          Show winner
+        </button>
+
+        {result && <p>{result}</p>}
+        {status && <p>{status}</p>}
+        {winner && (
+          <p>
+            Winner: <strong>{winner.displayName}</strong> – {winner.winningBid}
           </p>
-
-          <button
-            onClick={enterAuction}
-            style={{
-              alignSelf: "flex-start",
-              backgroundColor: "#ffffff",
-              color: "#111827",
-              padding: "14px 32px",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              letterSpacing: "0.12em",
-              borderRadius: "999px",
-              textTransform: "uppercase",
-              transition: "all 0.25s ease"
-            }}
-          >
-            Enter the auction
-          </button>
-        </div>
+        )}
       </div>
     </main>
   );
