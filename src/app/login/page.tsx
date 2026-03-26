@@ -24,22 +24,6 @@ export default function LoginPage() {
     }
   }
 
-  async function signUp(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage("");
-
-    const { error } = await supabaseBrowser.auth.signUp({
-      email,
-      password
-    });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage("Account created. You can now log in.");
-    }
-  }
-
   async function resetPassword() {
     setMessage("");
 
@@ -59,39 +43,62 @@ export default function LoginPage() {
 
   return (
     <main>
-      <h1>Login</h1>
+      <div className="panel animate-fade-up">
+        <h1>Log in</h1>
 
-      <form>
-        <div>
-          <label>Email</label><br />
+        <form onSubmit={signIn}>
+          <label>Email</label>
           <input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
           />
-        </div>
 
-        <div>
-          <label>Password</label><br />
+          <label>Password</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
           />
+
+          <button type="submit">Log in</button>
+        </form>
+
+        <div style={{ marginTop: "24px" }}>
+          <button
+            type="button"
+            onClick={() => (window.location.href = "/signup")}
+            style={{
+              backgroundColor: "transparent",
+              color: "#111827",
+              border: "1px solid #111827"
+            }}
+          >
+            Create account
+          </button>
         </div>
 
-        <button onClick={signIn}>Log In</button>
-        <br /><br />
-        <button onClick={signUp}>Create Account</button>
-        <br /><br />
-        <button type="button" onClick={resetPassword}>
-          Forgot password?
-        </button>
-      </form>
+        <div style={{ marginTop: "16px" }}>
+          <button
+            type="button"
+            onClick={resetPassword}
+            style={{
+              backgroundColor: "transparent",
+              color: "#6b7280",
+              border: "none",
+              padding: 0,
+              textTransform: "none",
+              letterSpacing: "normal"
+            }}
+          >
+            Forgot password?
+          </button>
+        </div>
 
-      {message && <p>{message}</p>}
+        {message && <p style={{ marginTop: "16px" }}>{message}</p>}
+      </div>
     </main>
   );
 }

@@ -7,70 +7,83 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function signUp(e: React.FormEvent) {
+  async function createAccount(e: React.FormEvent) {
     e.preventDefault();
-    setMessage(null);
+    setError(null);
+    setLoading(true);
 
-    const { data, error } = await supabaseBrowser.auth.signUp({
-      email,
-      password
-    });
+    // 1️⃣ Create auth user
+    const { data, error: signUpError } =
+      await supabaseBrowser.auth.signUp({
+        email,
+        password
+      });
 
-    if (error || !data.user) {
-      setMessage(error?.message || "Signup failed");
+    if (signUpError || !data.user) {
+      setError(signUpError?.message || "Failed to create account");
+      setLoading(false);
       return;
     }
 
-    // Save display name to profiles
-    await supabaseBrowser
+    // 2️⃣ Create / update profile with display name
+    const { error: profileError } = await supabaseBrowser
       .from("profiles")
-      .update({ display_name: displayName })
-      .eq("id", data.user.id);
+      .upsert({
+        id: data.user.id,
+        display_name: displayName,
+        role: "bidder" // default role
+      });
 
-    window.location.href = "/";
+    if (profileError) {
+      setError("Account created, but profile setup failed");
+      setLoading(false);
+      return;
+    }
+
+    // 3️⃣ Go to role selection
+    window.location.href = "/role";
   }
 
   return (
     <main>
-      <h1>Create Account</h1>
+      <div className="panel animate-fade-up">
+        <h1>Create account</h1>
 
-      <form onSubmit={signUp}>
-        <div>
-          <label>Email</label><br />
+        <form onSubmit={createAccount}>
+          <label>Display name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            required
+          />
+
+          <label>Email</label>
           <input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
           />
-        </div>
 
-        <div>
-          <label>Password</label><br />
+          <label>Password</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
           />
-        </div>
 
-        <div>
-          <label>Display Name</label><br />
-          <input
-            value={displayName}
-            onChange={e => setDisplayName(e.target.value)}
-            placeholder="e.g. Alice / Paddle 12"
-            required
-          />
-        </div>
+          <button type="submit" disabled={loading}>
+            {loading ? "Creating account…" : "Create account"}
+          </button>
+        </form>
 
-        <button type="submit">Create Account</button>
-      </form>
-
-      {message && <p>{message}</p>}
+        {error && <p style={{ marginTop: "16px" }}>{error}</p>}
+      </div>
     </main>
   );
 }
