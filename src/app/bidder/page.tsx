@@ -20,6 +20,8 @@ export default function BidderPage() {
   const [results, setResults] = useState<Record<string, AuctionResult>>({});
   const [bidInputs, setBidInputs] = useState<Record<string, string>>({});
   const [userId, setUserId] = useState<string>("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -65,10 +67,20 @@ export default function BidderPage() {
   }, []);
 
   async function submitBid(lotId: string) {
+    setMessage(null);
+    setError(null);
+
+    const value = Number(bidInputs[lotId]);
+
+    if (!value || value < 0) {
+      setError("Please enter a valid bid amount");
+      return;
+    }
+
     const session = await supabaseBrowser.auth.getSession();
     const token = session.data.session?.access_token;
 
-    await fetch("/api/submit-bid", {
+    const res = await fetch("/api/submit-bid", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -76,14 +88,24 @@ export default function BidderPage() {
       },
       body: JSON.stringify({
         lotId,
-        maxBid: Number(bidInputs[lotId])
+        maxBid: value
       })
     });
 
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      setError(data.error || "Failed to submit bid");
+      return;
+    }
+
+    // ✅ Optimistically update UI
     setMyBids(prev => ({
       ...prev,
-      [lotId]: Number(bidInputs[lotId])
+      [lotId]: value
     }));
+
+    setMessage("Bid updated successfully");
   }
 
   return (
@@ -92,6 +114,18 @@ export default function BidderPage() {
 
       <div className="panel animate-fade-up">
         <h1>Lots</h1>
+
+        {message && (
+          <p style={{ color: "#065f46", marginBottom: "16px" }}>
+            ✅ {message}
+          </p>
+        )}
+
+        {error && (
+          <p style={{ color: "#b91c1c", marginBottom: "16px" }}>
+            ⚠️ {error}
+          </p>
+        )}
 
         {lots.map(lot => {
           const auction = results[lot.lot_id];
@@ -131,7 +165,9 @@ export default function BidderPage() {
               )}
 
               {myBid !== undefined && (
-                <p>Your bid: <strong>{myBid}</strong></p>
+                <p>
+                  Your bid: <strong>{myBid}</strong>
+                </p>
               )}
 
               {lot.locked && auction && (
