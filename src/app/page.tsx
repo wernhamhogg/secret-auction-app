@@ -16,6 +16,7 @@ export default function HomePage() {
 
   return (
     <main>
+      {/* HERO */}
       <div
         style={{
           position: "relative",
@@ -57,7 +58,7 @@ export default function HomePage() {
           }}
         />
 
-        {/* Content */}
+        {/* Text overlay (desktop + mobile text) */}
         <div
           style={{
             position: "absolute",
@@ -83,8 +84,9 @@ export default function HomePage() {
 
           <p
             style={{
-              fontSize: "clamp(0.95rem, 3.5vw, 1.15rem)",
+              fontSize: "clamp(1rem, 3.5vw, 1.15rem)",
               fontWeight: 500,
+              color: "#f9fafb", // ✅ lighter for readability
               marginBottom: "28px",
               maxWidth: "640px",
               textShadow: "0 2px 10px rgba(0,0,0,0.7)"
@@ -93,8 +95,10 @@ export default function HomePage() {
             FOR THOSE NOT MAN ENOUGH TO TAKE PART IN PERSON
           </p>
 
+          {/* Desktop-only CTA */}
           <button
             onClick={enterAuction}
+            className="cta-desktop"
             style={{
               alignSelf: "flex-start",
               backgroundColor: "#ffffff",
@@ -110,6 +114,26 @@ export default function HomePage() {
             Enter the auction
           </button>
         </div>
+      </div>
+
+      {/* Mobile-only CTA BELOW image */}
+      <div className="cta-mobile" style={{ marginTop: "24px" }}>
+        <button
+          onClick={enterAuction}
+          style={{
+            width: "100%",
+            backgroundColor: "#111827",
+            color: "#ffffff",
+            padding: "16px 0",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            borderRadius: "999px",
+            textTransform: "uppercase"
+          }}
+        >
+          Enter the auction
+        </button>
       </div>
     </main>
   );

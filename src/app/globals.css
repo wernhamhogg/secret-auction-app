@@ -196,4 +196,22 @@ button:active {
   .hero-mobile {
     display: block;
   }
+}/* ===== Landing CTA visibility ===== */
+
+.cta-desktop {
+  display: inline-block;
+}
+
+.cta-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .cta-desktop {
+    display: none;
+  }
+
+  .cta-mobile {
+    display: block;
+  }
 }
