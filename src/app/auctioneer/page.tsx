@@ -26,6 +26,7 @@ export default function AuctioneerPage() {
   const [results, setResults] = useState<Record<string, AuctionResult>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [spokenBids, setSpokenBids] = useState<Record<string, string>>({});
+  const [checkMessages, setCheckMessages] = useState<Record<string, string>>({});
   const [ending, setEnding] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +75,32 @@ export default function AuctioneerPage() {
     load();
   }, []);
 
+  async function checkBid(lotId: string) {
+    const spokenBid = Number(spokenBids[lotId]);
+    if (!spokenBid) return;
+
+    const session = await supabaseBrowser.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    const res = await fetch("/api/check-bid", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ lotId, spokenBid })
+    });
+
+    const data = await res.json();
+
+    setCheckMessages(prev => ({
+      ...prev,
+      [lotId]: data.hasHigherSealedBid
+        ? "There is a higher sealed bid"
+        : "Spoken bid is currently the highest"
+    }));
+  }
+
   async function endAuction(lotId: string) {
     const spokenBid = Number(spokenBids[lotId]);
     if (!spokenBid) return;
@@ -111,9 +138,9 @@ export default function AuctioneerPage() {
 
               {!lot.locked && (
                 <>
-                  <label>Spoken bid</label>
                   <input
                     type="number"
+                    placeholder="Spoken bid"
                     value={spokenBids[lot.lot_id] || ""}
                     onChange={e =>
                       setSpokenBids(prev => ({
@@ -122,6 +149,14 @@ export default function AuctioneerPage() {
                       }))
                     }
                   />
+
+                  <button onClick={() => checkBid(lot.lot_id)}>
+                    Check bid
+                  </button>
+
+                  {checkMessages[lot.lot_id] && (
+                    <p>{checkMessages[lot.lot_id]}</p>
+                  )}
 
                   <button onClick={() => endAuction(lot.lot_id)}>
                     End auction
