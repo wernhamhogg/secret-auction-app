@@ -26,22 +26,20 @@ export default function AuctioneerPage() {
   const [results, setResults] = useState<Record<string, AuctionResult>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [spokenBids, setSpokenBids] = useState<Record<string, string>>({});
-  const [checkMessages, setCheckMessages] = useState<Record<string, string>>({});
   const [ending, setEnding] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const { data: userData } = await supabaseBrowser.auth.getUser();
-      if (!userData.user) {
+      const { data } = await supabaseBrowser.auth.getUser();
+      if (!data.user) {
         window.location.href = "/login";
         return;
       }
 
-      // ✅ Role check
       const { data: profile } = await supabaseBrowser
         .from("profiles")
         .select("role")
-        .eq("id", userData.user.id)
+        .eq("id", data.user.id)
         .single();
 
       if (profile?.role !== "auctioneer") {
@@ -49,7 +47,6 @@ export default function AuctioneerPage() {
         return;
       }
 
-      // ✅ Lots = source of truth
       const { data: lotsData } = await supabaseBrowser
         .from("lots")
         .select("lot_id, locked")
@@ -57,63 +54,30 @@ export default function AuctioneerPage() {
 
       setLots(lotsData || []);
 
-      // ✅ Auction results (only shown after end)
       const { data: auctionData } = await supabaseBrowser
         .from("auctions")
         .select("lot_id, winner_id, winning_bid, tie_break_applied");
 
-      const resultMap: Record<string, AuctionResult> = {};
-      auctionData?.forEach(a => {
-        resultMap[a.lot_id] = a;
-      });
-      setResults(resultMap);
+      const map: Record<string, AuctionResult> = {};
+      auctionData?.forEach(a => (map[a.lot_id] = a));
+      setResults(map);
 
-      // ✅ Display names
       const { data: profileData } = await supabaseBrowser
         .from("profiles")
         .select("id, display_name");
 
-      const profileMap: Record<string, string> = {};
-      profileData?.forEach((p: Profile) => {
-        profileMap[p.id] = p.display_name;
-      });
-
-      setProfiles(profileMap);
+      const pMap: Record<string, string> = {};
+      profileData?.forEach((p: Profile) => (pMap[p.id] = p.display_name));
+      setProfiles(pMap);
     }
 
     load();
   }, []);
 
-  async function checkBid(lotId: string) {
+  async function endAuction(lotId: string) {
     const spokenBid = Number(spokenBids[lotId]);
     if (!spokenBid) return;
 
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    const res = await fetch("/api/check-bid", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        lotId,
-        spokenBid
-      })
-    });
-
-    const data = await res.json();
-
-    setCheckMessages(prev => ({
-      ...prev,
-      [lotId]: data.hasHigherSealedBid
-        ? "There is a higher sealed bid"
-        : "Spoken bid is currently the highest"
-    }));
-  }
-
-  async function endAuction(lotId: string) {
     setEnding(lotId);
 
     const session = await supabaseBrowser.auth.getSession();
@@ -125,7 +89,7 @@ export default function AuctioneerPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ lotId })
+      body: JSON.stringify({ lotId, spokenBid })
     });
 
     window.location.reload();
@@ -135,23 +99,19 @@ export default function AuctioneerPage() {
     <main>
       <Header />
 
-      <div className="panel animate-fade-up">
+      <div className="panel">
         <h1>Auctioneer</h1>
 
         {lots.map(lot => {
           const result = results[lot.lot_id];
 
           return (
-            <div
-              key={lot.lot_id}
-              className="hover-lift"
-              style={{ marginBottom: "36px" }}
-            >
+            <div key={lot.lot_id} style={{ marginBottom: "32px" }}>
               <h2>{lot.lot_id}</h2>
 
               {!lot.locked && (
                 <>
-                  <label>Current spoken bid</label>
+                  <label>Spoken bid</label>
                   <input
                     type="number"
                     value={spokenBids[lot.lot_id] || ""}
@@ -163,54 +123,27 @@ export default function AuctioneerPage() {
                     }
                   />
 
-                  <button
-                    onClick={() => checkBid(lot.lot_id)}
-                    style={{ marginLeft: "8px" }}
-                  >
-                    Check bid
-                  </button>
-
-                  {checkMessages[lot.lot_id] && (
-                    <p style={{ marginTop: "8px" }}>
-                      {checkMessages[lot.lot_id]}
-                    </p>
-                  )}
-
-                  <button
-                    onClick={() => endAuction(lot.lot_id)}
-                    disabled={ending === lot.lot_id}
-                    style={{ marginTop: "12px" }}
-                  >
-                    {ending === lot.lot_id
-                      ? "Ending auction…"
-                      : "End auction"}
+                  <button onClick={() => endAuction(lot.lot_id)}>
+                    End auction
                   </button>
                 </>
               )}
 
               {lot.locked && result && (
-                result.winner_id ? (
-                  <p>
-                    Winner:{" "}
-                    <strong>
-                      {profiles[result.winner_id] || "Unknown"}
-                    </strong>{" "}
-                    — <strong>{result.winning_bid}</strong>
-                    {result.tie_break_applied && (
-                      <span
-                        style={{
-                          marginLeft: "8px",
-                          color: "#6b7280",
-                          fontSize: "0.85rem"
-                        }}
-                      >
-                        (tie‑break applied)
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <p>No bids placed</p>
-                )
+                <p>
+                  Winner:{" "}
+                  <strong>
+                    {result.winner_id
+                      ? profiles[result.winner_id]
+                      : "In‑room bid"}
+                  </strong>{" "}
+                  — <strong>{result.winning_bid}</strong>
+                  {result.tie_break_applied && (
+                    <span style={{ marginLeft: "8px", color: "#6b7280" }}>
+                      (tie resolved in favour of spoken bid)
+                    </span>
+                  )}
+                </p>
               )}
 
               <hr />

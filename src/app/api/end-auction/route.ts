@@ -15,17 +15,14 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // ✅ Verify user
     const {
-      data: { user },
-      error: authError
+      data: { user }
     } = await supabase.auth.getUser(token);
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid user" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ✅ Confirm auctioneer role
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -36,9 +33,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { lotId } = await req.json();
-    if (!lotId) {
-      return NextResponse.json({ error: "Missing lotId" }, { status: 400 });
+    const { lotId, spokenBid } = await req.json();
+
+    if (!lotId || typeof spokenBid !== "number") {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
     // ✅ Lock the lot
@@ -47,68 +45,78 @@ export async function POST(req: Request) {
       .update({ locked: true })
       .eq("lot_id", lotId);
 
-    // ✅ Get highest bid value
+    // ✅ Get highest sealed bid
     const { data: topBidRow } = await supabase
       .from("bids")
-      .select("max_bid")
+      .select("bidder_id, max_bid")
       .eq("lot_id", lotId)
       .order("max_bid", { ascending: false })
       .limit(1)
       .single();
 
+    // ✅ No sealed bids at all → spoken bid wins
     if (!topBidRow) {
-      // No bids
       await supabase.from("auctions").upsert({
         lot_id: lotId,
         winner_id: null,
-        winning_bid: null,
+        winning_bid: spokenBid,
         tie_break_applied: false
       });
 
-      return NextResponse.json({ status: "Auction ended — no bids" });
+      return NextResponse.json({
+        status: "Auction ended",
+        winner: "spoken",
+        winningBid: spokenBid
+      });
     }
 
-    const topBid = topBidRow.max_bid;
+    const highestSealedBid = topBidRow.max_bid;
 
-    // ✅ Get all tied bids
-    const { data: tiedBids } = await supabase
-      .from("bids")
-      .select("bidder_id, max_bid")
-      .eq("lot_id", lotId)
-      .eq("max_bid", topBid);
+    // ✅ CASE 1 — Sealed bid strictly higher
+    if (highestSealedBid > spokenBid) {
+      await supabase.from("auctions").upsert({
+        lot_id: lotId,
+        winner_id: topBidRow.bidder_id,
+        winning_bid: highestSealedBid,
+        tie_break_applied: false
+      });
 
-    if (!tiedBids || tiedBids.length === 0) {
-      return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
+      return NextResponse.json({
+        status: "Auction ended",
+        winner: "sealed",
+        winningBid: highestSealedBid
+      });
     }
 
-    let winner;
-    let winningBid;
-    let tieBreakApplied = false;
+    // ✅ CASE 2 — Spoken bid strictly higher
+    if (spokenBid > highestSealedBid) {
+      await supabase.from("auctions").upsert({
+        lot_id: lotId,
+        winner_id: null,
+        winning_bid: spokenBid,
+        tie_break_applied: false
+      });
 
-    if (tiedBids.length === 1) {
-      winner = tiedBids[0];
-      winningBid = winner.max_bid;
-    } else {
-      // ✅ Random tie-break
-      const randomIndex = Math.floor(Math.random() * tiedBids.length);
-      winner = tiedBids[randomIndex];
-      winningBid = winner.max_bid + 5;
-      tieBreakApplied = true;
+      return NextResponse.json({
+        status: "Auction ended",
+        winner: "spoken",
+        winningBid: spokenBid
+      });
     }
 
-    // ✅ Persist result ONCE
+    // ✅ CASE 3 — TIE → spoken bid wins, with explicit tie-break
     await supabase.from("auctions").upsert({
       lot_id: lotId,
-      winner_id: winner.bidder_id,
-      winning_bid: winningBid,
-      tie_break_applied: tieBreakApplied
+      winner_id: null,
+      winning_bid: spokenBid,
+      tie_break_applied: true
     });
 
     return NextResponse.json({
       status: "Auction ended",
-      winner: winner.bidder_id,
-      winningBid,
-      tieBreakApplied
+      winner: "spoken",
+      winningBid: spokenBid,
+      tieBreakApplied: true
     });
   } catch (err: any) {
     return NextResponse.json(

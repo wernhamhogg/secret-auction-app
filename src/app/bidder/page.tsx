@@ -17,20 +17,18 @@ type AuctionResult = {
 
 export default function BidderPage() {
   const [lots, setLots] = useState<Lot[]>([]);
-  const [myBids, setMyBids] = useState<Record<string, number>>({});
   const [results, setResults] = useState<Record<string, AuctionResult>>({});
-  const [bidInputs, setBidInputs] = useState<Record<string, string>>({});
   const [userId, setUserId] = useState<string>("");
 
   useEffect(() => {
     async function load() {
-      const { data: userData } = await supabaseBrowser.auth.getUser();
-      if (!userData.user) {
+      const { data } = await supabaseBrowser.auth.getUser();
+      if (!data.user) {
         window.location.href = "/login";
         return;
       }
 
-      setUserId(userData.user.id);
+      setUserId(data.user.id);
 
       const { data: lotsData } = await supabaseBrowser
         .from("lots")
@@ -39,128 +37,50 @@ export default function BidderPage() {
 
       setLots(lotsData || []);
 
-      const { data: bidsData } = await supabaseBrowser
-        .from("bids")
-        .select("lot_id, max_bid")
-        .eq("bidder_id", userData.user.id);
-
-      const bidMap: Record<string, number> = {};
-      bidsData?.forEach(b => (bidMap[b.lot_id] = b.max_bid));
-      setMyBids(bidMap);
-
       const { data: auctionData } = await supabaseBrowser
         .from("auctions")
         .select("lot_id, winner_id, winning_bid, tie_break_applied");
 
-      const resultMap: Record<string, AuctionResult> = {};
-      auctionData?.forEach(a => {
-        resultMap[a.lot_id] = {
-          winner_id: a.winner_id,
-          winning_bid: a.winning_bid,
-          tie_break_applied: a.tie_break_applied
-        };
-      });
-
-      setResults(resultMap);
+      const map: Record<string, AuctionResult> = {};
+      auctionData?.forEach(a => (map[a.lot_id] = a));
+      setResults(map);
     }
 
     load();
   }, []);
 
-  async function submitBid(lotId: string) {
-    const session = await supabaseBrowser.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    await fetch("/api/submit-bid", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        lotId,
-        maxBid: Number(bidInputs[lotId])
-      })
-    });
-
-    setMyBids(prev => ({
-      ...prev,
-      [lotId]: Number(bidInputs[lotId])
-    }));
-  }
-
   return (
     <main>
       <Header />
 
-      <div className="panel animate-fade-up">
+      <div className="panel">
         <h1>Lots</h1>
 
         {lots.map(lot => {
           const auction = results[lot.lot_id];
-          const myBid = myBids[lot.lot_id];
-
           const iWon =
             lot.locked &&
             auction &&
             auction.winner_id === userId;
 
           return (
-            <div
-              key={lot.lot_id}
-              className="hover-lift"
-              style={{ marginBottom: "32px" }}
-            >
+            <div key={lot.lot_id} style={{ marginBottom: "24px" }}>
               <h2>{lot.lot_id}</h2>
 
-              {!lot.locked && (
-                <>
-                  <input
-                    type="number"
-                    placeholder="Your max bid"
-                    value={bidInputs[lot.lot_id] || ""}
-                    onChange={e =>
-                      setBidInputs(prev => ({
-                        ...prev,
-                        [lot.lot_id]: e.target.value
-                      }))
-                    }
-                  />
-
-                  <button onClick={() => submitBid(lot.lot_id)}>
-                    Submit bid
-                  </button>
-                </>
-              )}
-
-              {myBid !== undefined && (
-                <p>
-                  Your bid: <strong>{myBid}</strong>
-                </p>
-              )}
-
               {lot.locked && auction && (
-                <div style={{ marginTop: "12px" }}>
-                  {iWon ? (
-                    <p>
-                      🏆 <strong>You won</strong> with a bid of{" "}
-                      <strong>{auction.winning_bid}</strong>
-                      {auction.tie_break_applied && (
-                        <span
-                          style={{
-                            marginLeft: "6px",
-                            color: "#6b7280",
-                            fontSize: "0.85rem"
-                          }}
-                        >
-                          (tie‑break applied)
-                        </span>
-                      )}
-                    </p>
-                  ) : (
-                    <p>❌ Auction ended — you did not win</p>
-                  )}
-                </div>
+                iWon ? (
+                  <p>
+                    🏆 You won with{" "}
+                    <strong>{auction.winning_bid}</strong>
+                    {auction.tie_break_applied && (
+                      <span style={{ marginLeft: "6px", color: "#6b7280" }}>
+                        (tie resolved in favour of spoken bid)
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p>❌ Auction ended — you did not win</p>
+                )
               )}
 
               <hr />
